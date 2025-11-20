@@ -33,6 +33,8 @@ GEODB_BASE_URL = "http://geodb-free-service.wirefreethought.com/graphql"
 import requests
 import sqlite3
 import json
+from create_database import create_database
+
 
 # ============================================================
 # FETCH FUNCTIONS (to be completed by each team member)
@@ -151,6 +153,8 @@ def write_results_to_file(city_stats, filename="results.txt"):
 
 def main():
     """Run all steps of the project in order."""
+    create_database("final_project.db")
+
     # TODO: Put the workflow here
     pass
 
