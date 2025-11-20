@@ -51,6 +51,7 @@ def fetch_air_quality(city_list):
 
 
 def fetch_city_data(limit=10, min_population=50000):
+     # TODO: Sarah fills this in
     """
     Fetch city metadata (name, country, population, coordinates)
     from the GeoDB Free GraphQL API. No API key required.
