@@ -153,5 +153,84 @@ def main():
     pass
 
 
+# ============================================================
+# TEST CASE TEMPLATES (do NOT fill in yet)
+# ============================================================
+
+# -----------------------------
+# Test Cases for April
+# -----------------------------
+def test_fetch_weather():
+    """Test template for fetch_weather (April)."""
+    # TODO: Valid city list, invalid city handling, response structure
+    pass
+
+def test_store_weather_data():
+    """Test template for store_weather_data (April)."""
+    # TODO: Insert rows, link to Cities table
+    pass
+
+def test_plot_city_characteristics():
+    """Test template for plot_city_characteristics (April)."""
+    # TODO: Chart creation, missing data handling
+    pass
+
+def test_write_results_to_file():
+    """Test template for write_results_to_file (April)."""
+    # TODO: File creation + formatting
+    pass
+
+
+# -----------------------------
+# Test Cases for Kyndal
+# -----------------------------
+def test_fetch_air_quality():
+    """Test template for fetch_air_quality (Kyndal)."""
+    # TODO: Valid response, empty dataset handling
+    pass
+
+def test_store_air_quality_data():
+    """Test template for store_air_quality_data (Kyndal)."""
+    # TODO: Insert station + measurement rows
+    pass
+
+def test_plot_temp_vs_pm25():
+    """Test template for plot_temp_vs_pm25 (Kyndal)."""
+    # TODO: Scatter creation, missing values
+    pass
+
+
+# -----------------------------
+# Test Cases for Sarah
+# -----------------------------
+def test_fetch_city_data():
+    """Test template for fetch_city_data (Sarah)."""
+    # TODO: Valid GraphQL response, filtering, field structure
+    pass
+
+def test_store_city_data():
+    """Test template for store_city_data (Sarah)."""
+    # TODO: Insert GeoCities + CityDetails rows
+    pass
+
+def test_plot_population_vs_pm25():
+    """Test template for plot_population_vs_pm25 (Sarah)."""
+    # TODO: Scatter creation, missing population
+    pass
+
+
+# -----------------------------
+# Combined Function Tests
+# -----------------------------
+def test_calculate_city_stats():
+    """Test template for calculate_city_stats (Kyndal + Sarah)."""
+    # TODO: Join all three APIs, compute averages & metrics
+    pass
+
+
+# ============================================================
+# RUN MAIN
+# ============================================================
+
 if __name__ == "__main__":
     main()
