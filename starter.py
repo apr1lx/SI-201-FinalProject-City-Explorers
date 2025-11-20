@@ -6,9 +6,14 @@
 # -----------------------------
 # API KEYS (fill these in)
 # -----------------------------
-OPENWEATHER_API_KEY = "YOUR_OPENWEATHER_API_KEY_HERE"
-OPENAQ_API_KEY = None   # OpenAQ does not require an API key
-GEODB_API_KEY = "YOUR_GEODB_API_KEY_HERE"   # from RapidAPI
+# OpenWeatherMap requires an API key
+OPENWEATHER_API_KEY = "adb50d52c8775272ca4a7fc399f99e2f"
+
+# OpenAQ does NOT require an API key
+OPENAQ_API_KEY = None
+
+# GeoDB Free GraphQL API does NOT require any key
+GEODB_API_KEY = None
 
 # -----------------------------
 # BASE URLS
@@ -19,8 +24,8 @@ OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/"
 # OpenAQ (Air Quality)
 OPENAQ_BASE_URL = "https://api.openaq.org/v2/"
 
-# GeoDB Cities (City population + metadata)
-GEODB_BASE_URL = "https://wft-geo-db.p.rapidapi.com/v1/geo/"
+# GeoDB Free GraphQL API (NO API KEY REQUIRED)
+GEODB_BASE_URL = "http://geodb-free-service.wirefreethought.com/graphql"
 
 # ============================================================
 # IMPORTS
@@ -45,10 +50,33 @@ def fetch_air_quality(city_list):
     pass
 
 
-def fetch_city_data():
-    """Fetch city metadata (population, coordinates, etc.) from GeoDB Cities."""
-    # TODO: Sarah fills this in
-    pass
+def fetch_city_data(limit=10, min_population=50000):
+    """
+    Fetch city metadata (name, country, population, coordinates)
+    from the GeoDB Free GraphQL API. No API key required.
+    """
+    query = f"""
+    {{
+      cities(limit: {limit}, offset: 0, minPopulation: {min_population}) {{
+        id
+        name
+        country
+        region
+        population
+        latitude
+        longitude
+      }}
+    }}
+    """
+
+    response = requests.post(GEODB_BASE_URL, json={"query": query})
+
+    if response.status_code != 200:
+        print("Error fetching GeoDB Cities data:", response.text)
+        return []
+
+    data = response.json()
+    return data.get("data", {}).get("cities", [])
 
 
 # ============================================================
