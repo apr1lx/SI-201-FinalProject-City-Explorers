@@ -252,7 +252,7 @@ def calculate_city_stats(conn):
         })
 
     return city_stats
-## trying to commit
+
 
 # ============================================================
 # VISUALIZATIONS
@@ -261,7 +261,40 @@ def calculate_city_stats(conn):
 def plot_temp_vs_pm25(city_stats):
     """Scatter plot of avg temperature vs avg PM2.5."""
     # TODO: Kyndal fills this in
-    pass
+    # Filter out any cities that are missing temp or pm25
+    temps = []
+    pm25_values = []
+    labels = []
+
+    for city_info in city_stats:
+        avg_temp = city_info.get("avg_temp")
+        avg_pm25 = city_info.get("avg_pm25")
+
+        if avg_temp is None or avg_pm25 is None:
+            continue
+
+        temps.append(avg_temp)
+        pm25_values.append(avg_pm25)
+        labels.append(city_info.get("city"))
+
+    # Nothing to plot? Just return.
+    if not temps or not pm25_values:
+        print("No data available to plot temperature vs PM2.5.")
+        return
+
+    plt.figure()
+    plt.scatter(temps, pm25_values)
+
+    # Label each point with the city name (small text so it doesn't get too messy)
+    for x, y, label in zip(temps, pm25_values, labels):
+        plt.text(x, y, label, fontsize=8)
+
+    plt.xlabel("Average Temperature")
+    plt.ylabel("Average PM2.5")
+    plt.title("Average Temperature vs Average PM2.5 by City")
+    plt.tight_layout()
+    plt.show()
+
 
 
 def plot_population_vs_pm25(city_stats):
