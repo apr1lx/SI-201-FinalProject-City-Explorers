@@ -34,6 +34,7 @@ import requests
 import sqlite3
 import json
 from create_database import create_database
+import matplotlib.pyplot as plt
 
 
 # ============================================================
@@ -49,7 +50,63 @@ def fetch_weather(city_list):
 def fetch_air_quality(city_list):
     """Fetch air quality (PM2.5) for each city from OpenAQ."""
     # TODO: Kyndal fills this in
-    pass
+    """Fetch air quality (PM2.5) for each city from OpenAQ."""
+    results = []
+
+    for city in city_list:
+        # Build the request parameters for OpenAQ
+        params = {
+            "city": city,
+            "parameter": "pm25",
+            "limit": 1
+        }
+
+        try:
+            # Call the OpenAQ /latest endpoint
+            response = requests.get(OPENAQ_BASE_URL + "latest", params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+        except Exception as e:
+            # If anything goes wrong, print the error and skip this city
+            print(f"Error fetching air quality for {city}: {e}")
+            continue
+
+        # Make sure we actually got results back
+        results_list = data.get("results", [])
+        if not results_list:
+            continue
+
+        first_result = results_list[0]
+
+        # Measurements is a list of different pollutants; we want pm25
+        measurements = first_result.get("measurements", [])
+        pm25_value = None
+        pm25_unit = None
+
+        for m in measurements:
+            if m.get("parameter") == "pm25":
+                pm25_value = m.get("value")
+                pm25_unit = m.get("unit")
+                break
+
+        # If we never found a pm25 measurement, skip this city
+        if pm25_value is None:
+            continue
+
+        # Coordinates and location name for the station
+        coords = first_result.get("coordinates", {})
+        location_name = first_result.get("location")
+
+        results.append({
+            "city": city,
+            "location": location_name,
+            "latitude": coords.get("latitude"),
+            "longitude": coords.get("longitude"),
+            "pm25": pm25_value,
+            "unit": pm25_unit
+        })
+
+    return results
 
 
 def fetch_city_data(limit=10, min_population=50000):
@@ -96,7 +153,54 @@ def store_air_quality_data(conn, aq_data):
     """Insert air-quality station + measurement data."""
     # TODO: Kyndal fills this in
     ## test test 
-    pass
+    """Insert air-quality station + measurement data."""
+    cur = conn.cursor()
+
+    # Create tables if they do not exist yet
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS AirQualityStations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            city TEXT,
+            location TEXT,
+            latitude REAL,
+            longitude REAL
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS AirQualityMeasurements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            station_id INTEGER,
+            pm25 REAL,
+            unit TEXT,
+            FOREIGN KEY (station_id) REFERENCES AirQualityStations(id)
+        )
+    """)
+
+    # Insert one station row + one measurement row per item in aq_data
+    for item in aq_data:
+        city = item.get("city")
+        location = item.get("location")
+        lat = item.get("latitude")
+        lon = item.get("longitude")
+        pm25 = item.get("pm25")
+        unit = item.get("unit")
+
+        # Insert station
+        cur.execute("""
+            INSERT INTO AirQualityStations (city, location, latitude, longitude)
+            VALUES (?, ?, ?, ?)
+        """, (city, location, lat, lon))
+
+        station_id = cur.lastrowid  # ID of the station we just inserted
+
+        # Insert measurement linked to that station
+        cur.execute("""
+            INSERT INTO AirQualityMeasurements (station_id, pm25, unit)
+            VALUES (?, ?, ?)
+        """, (station_id, pm25, unit))
+
+    conn.commit()
 
 
 def store_city_data(conn, city_data):
@@ -112,7 +216,42 @@ def store_city_data(conn, city_data):
 def calculate_city_stats(conn):
     """Combine weather, air quality, and city metadata into per-city stats."""
     # TODO: Kyndal + Sarah fill this in
-    pass
+    """Combine weather, air quality, and city metadata into per-city stats."""
+    cur = conn.cursor()
+
+    # NOTE: You may need to tweak table/column names to match your actual schema.
+    query = """
+        SELECT
+            c.name AS city,
+            AVG(w.temperature) AS avg_temp,
+            AVG(aqm.pm25) AS avg_pm25,
+            g.population AS population
+        FROM Cities AS c
+        JOIN WeatherObservations AS w
+            ON w.city_id = c.id
+        JOIN AirQualityStations AS aqs
+            ON aqs.city = c.name
+        JOIN AirQualityMeasurements AS aqm
+            ON aqm.station_id = aqs.id
+        LEFT JOIN GeoCities AS g
+            ON g.name = c.name
+        GROUP BY c.name
+        ORDER BY c.name
+    """
+
+    cur.execute(query)
+    rows = cur.fetchall()
+
+    city_stats = []
+    for row in rows:
+        city_stats.append({
+            "city": row[0],
+            "avg_temp": row[1],
+            "avg_pm25": row[2],
+            "population": row[3]
+        })
+
+    return city_stats
 
 
 # ============================================================
