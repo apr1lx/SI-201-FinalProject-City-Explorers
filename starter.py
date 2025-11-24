@@ -252,7 +252,7 @@ def calculate_city_stats(conn):
         })
 
     return city_stats
-
+## trying to commit
 
 # ============================================================
 # VISUALIZATIONS
