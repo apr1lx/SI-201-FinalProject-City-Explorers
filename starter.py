@@ -149,7 +149,37 @@ def plot_temp_vs_pm25(city_stats):
 def plot_population_vs_pm25(city_stats):
     """Scatter plot of population vs PM2.5."""
     # TODO: Sarah fills this in
-    pass
+    # Make empty lists to store the values to plot
+    populations = []
+    pm25_values = []
+    labels = []
+    # Go through each city's stats from the database
+    for city in city_stats:
+        pop = city.get("population")
+        pm25 = city.get("avg_pm25")
+        # Skip cities that are missing population or PM2.5
+        if pop is None or pm25 is None:
+            continue
+        populations.append(pop)
+        pm25_values.append(pm25)
+        labels.append(city.get("city"))
+    # If nothing valid to plot print a message
+    if not populations or not pm25_values:
+        print("Not enough city data to plot Population vs PM2.5.")
+        return
+    # Make the scatter plot
+    plt.figure()
+    plt.scatter(populations, pm25_values)
+    # Add labels nex to each dot for each city
+    for x, y, label in zip(populations, pm25_values, labels):
+        plt.text(x, y, label, fontsize=7)
+    # Label the axes and title
+    plt.xlabel("Population")
+    plt.ylabel("Average PM2.5")
+    plt.title("City Population vs PM2.5 Levels")
+    # Adjust layout so everything fits
+    plt.tight_layout()
+    plt.show()
 
 
 def plot_city_characteristics(city_stats):
