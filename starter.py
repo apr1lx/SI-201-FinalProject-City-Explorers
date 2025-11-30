@@ -43,7 +43,58 @@ from create_database import create_database
 def fetch_weather(city_list):
     """Fetch weather data for a list of cities from OpenWeatherMap."""
     # TODO: April fills this in
-    pass
+    results = []
+    for city in city_list:
+        params = {
+            "q": city,
+            "appid": OPENWEATHER_API_KEY,
+            "units": "metric"
+        }
+        response = requests.get(OPENWEATHER_BASE_URL + "weather", params=params)
+
+        if response.status_code != 200:
+            print(f"Error fetching weather data for {city}: {response.text}")
+            continue
+
+        data = response.json()
+        
+        city_name = data.get("name")
+        country = data.get("sys", {}).get("country")
+
+        latitude = data.get("coord", {}).get("lat")
+        longitude = data.get("coord", {}).get("lon")
+
+        main_info = data.get("main", {})
+        temperature = main_info.get("temp")
+        feels_like = main_info.get("feels_like")
+        humidity = main_info.get("humidity")
+
+        wind_info = data.get("wind", {})
+        wind_speed = wind_info.get("speed")
+
+        weather_list = data.get("weather", [])
+        if len(weather_list) > 0:
+            weather_main = weather_list[0].get("main")
+        else:
+            weather_main = None
+        
+        timestamp = data.get("dt")
+
+        weather_dict = {
+            "city": city_name,
+            "country": country,
+            "latitude": latitude,
+            "longitude": longitude,
+            "temperature": temperature,
+            "feels_like": feels_like,
+            "humidity": humidity,
+            "wind_speed": wind_speed,
+            "weather_main": weather_main
+        }
+        results.append(weather_dict)
+    return results
+
+    
 
 
 def fetch_air_quality(city_list):
