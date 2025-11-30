@@ -285,9 +285,9 @@ def plot_city_characteristics(city_stats):
     populations = []
 
     for city in city_stats:
-        city_name = city_info.get("city")
-        population = city_info.get("population")    
-        aq_category = city_info.get("aq_category")
+        city_name = city.get("city")
+        population = city.get("population")    
+        aq_category = city.get("aq_category")
 
         if population is None:
             continue 
@@ -324,7 +324,28 @@ def plot_city_characteristics(city_stats):
 def write_results_to_file(city_stats, filename="results.txt"):
     """Write final calculated statistics to a text file."""
     # TODO: April fills this in
-    pass
+    try:
+        with open(filename, "w") as f:
+            f.write(f"City Statistics Results\n")
+            f.write(f"{'-'*40}\n")
+
+            for city in city_stats:
+                name = city.get("city")
+                population = city.get("population")
+                avg_temp = city.get("avg_temperature")
+                avg_pm25 = city.get("avg_pm25")
+                aq_category = city.get("aq_category")
+
+                f.write(f"City: {name}\n")
+                f.write(f"Population: {population}\n")
+                f.write(f"Average Temperature: {avg_temp}\n")
+                f.write(f"Average PM2.5: {avg_pm25}\n")
+                f.write(f"Air Quality Category: {aq_category}\n")
+                f.write(f"{'-'*40}\n")
+
+            print(f"Results successfully written to {filename}")
+    except Exception as e:
+        print(f"Error writing results to file: {e}")
 
 
 # ============================================================
