@@ -34,6 +34,7 @@ import requests
 import sqlite3
 import json
 from create_database import create_database
+import matplotlib.pyplot as plt
 
 
 # ============================================================
@@ -280,7 +281,40 @@ def plot_population_vs_pm25(city_stats):
 def plot_city_characteristics(city_stats):
     """Bar chart of city characteristics (e.g., population or elevation) with air-quality categories."""
     # TODO: April fills this in
-    pass
+    city_labels = []
+    populations = []
+
+    for city in city_stats:
+        city_name = city_info.get("city")
+        population = city_info.get("population")    
+        aq_category = city_info.get("aq_category")
+
+        if population is None:
+            continue 
+
+        if aq_category is not None:
+            label = f"{city_name} ({aq_category})"
+        else:
+            label = city_name
+
+        city_labels.append(label)
+        populations.append(population)
+
+    if not populations:
+        print("No valid population data to plot.")
+        return
+    
+    plt.figure()
+    x_positions = range(len(city_labels))
+    plt.bar(x_positions, populations)
+    plt.xticks(x_positions, city_labels, rotation=45, ha='right')
+    plt.xlabel("Cities (with AQ Category)")
+    plt.ylabel("Population")
+    plt.title("City Populations with Air Quality Categories")
+    plt.tight_layout()
+    plt.show()
+
+
 
 
 # ============================================================
