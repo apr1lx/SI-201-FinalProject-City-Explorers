@@ -137,8 +137,52 @@ def fetch_city_data(limit=10, min_population=50000):
 def store_weather_data(conn, weather_data):
     """Insert weather data into Cities + WeatherObservations tables."""
     # TODO: April fills this in
-    pass
+    cur = conn.cursor()
 
+    for item in weather_data:
+        city = item.get("city")
+        country = item.get("country")
+        latitude = item.get("latitude")
+        longitude = item.get("longitude")
+
+        cur.execute("""INSERT OR IGNORE INTO Cities (name, country, latitude, longitude) VALUES (?, ?, ?, ?)""",
+                    (city, country, latitude, longitude))
+        
+        cur.execute("""SELECT id FROM Cities WHERE name = ? AND country = ?""", (city, country))
+        row = cur.fetchone()
+
+        if row is None:
+            print(f"City {city} not found in Cities table.")
+            continue
+
+        city_id = row[0]
+
+        cur.execute("""
+            SELECT id FROM Cities WHERE city_name = ? AND country = ?
+        """, (city, country))
+        row = cur.fetchone()
+
+        if row is None:
+            print(f"City {city} not found in Cities table.")
+            continue
+
+        city_id = row[0]
+
+        cur.execute("""
+            INSERT INTO WeatherObservations 
+            (city_id, timestamp, temperature, feels_like, humidity, wind_speed, weather_main)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            city_id,
+            item.get("timestamp"),
+            item.get("temperature"),
+            item.get("feels_like"),
+            item.get("humidity"),
+            item.get("wind_speed"),
+            item.get("weather_main")
+        ))
+
+    conn.commit()
 
 def store_air_quality_data(conn, aq_data):
     """Insert air-quality station + measurement data."""
