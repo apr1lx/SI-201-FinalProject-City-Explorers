@@ -82,10 +82,11 @@ def fetch_weather(city_list):
         timestamp = data.get("dt")
 
         weather_dict = {
-            "city": city_name,
+            "city_name": city_name,
             "country": country,
             "latitude": latitude,
             "longitude": longitude,
+            "timestamp": timestamp,
             "temperature": temperature,
             "feels_like": feels_like,
             "humidity": humidity,
@@ -197,23 +198,16 @@ def store_weather_data(conn, weather_data):
     cur = conn.cursor()
 
     for item in weather_data:
-        city = item.get("city")
+        city = item.get("city_name")
         country = item.get("country")
         latitude = item.get("latitude")
         longitude = item.get("longitude")
 
-        cur.execute("""INSERT OR IGNORE INTO Cities (name, country, latitude, longitude) VALUES (?, ?, ?, ?)""",
-                    (city, country, latitude, longitude))
+        cur.execute("""
+            INSERT OR IGNORE INTO Cities (city_name, country, latitude, longitude)
+            VALUES (?, ?, ?, ?)
+        """, (city, country, latitude, longitude))
         
-        cur.execute("""SELECT id FROM Cities WHERE name = ? AND country = ?""", (city, country))
-        row = cur.fetchone()
-
-        if row is None:
-            print(f"City {city} not found in Cities table.")
-            continue
-
-        city_id = row[0]
-
         cur.execute("""
             SELECT id FROM Cities WHERE city_name = ? AND country = ?
         """, (city, country))
@@ -248,12 +242,12 @@ def store_air_quality_data(conn, aq_data):
     
     cur = conn.cursor()
 
-    # Create tables if they do not exist yet
     cur.execute("""
-        CREATE TABLE IF NOT EXISTS AirQualityStations (
+        CREATE TABLE IF NOT EXISTS AirQualityLocations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            city TEXT,
-            location TEXT,
+            city_name TEXT,
+            location_name TEXT,
+            country TEXT,
             latitude REAL,
             longitude REAL
         )
@@ -262,14 +256,15 @@ def store_air_quality_data(conn, aq_data):
     cur.execute("""
         CREATE TABLE IF NOT EXISTS AirQualityMeasurements (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            station_id INTEGER,
-            pm25 REAL,
+            location_id INTEGER,
+            timestamp TEXT,
+            parameter TEXT,
+            value REAL,
             unit TEXT,
-            FOREIGN KEY (station_id) REFERENCES AirQualityStations(id)
+            FOREIGN KEY (location_id) REFERENCES AirQualityLocations(id)
         )
     """)
 
-    # Insert one station row + one measurement row per item in aq_data
     for item in aq_data:
         city = item.get("city")
         location = item.get("location")
@@ -278,19 +273,16 @@ def store_air_quality_data(conn, aq_data):
         pm25 = item.get("pm25")
         unit = item.get("unit")
 
-        # Insert station
         cur.execute("""
-            INSERT INTO AirQualityStations (city, location, latitude, longitude)
-            VALUES (?, ?, ?, ?)
-        """, (city, location, lat, lon))
+            INSERT INTO AirQualityLocations (city_name, location_name, country, latitude, longitude)
+            VALUES (?, ?, ?, ?, ?)
+        """, (city, location, None, lat, lon))
+        location_id = cur.lastrowid
 
-        station_id = cur.lastrowid  # ID of the station we just inserted
-
-        # Insert measurement linked to that station
         cur.execute("""
-            INSERT INTO AirQualityMeasurements (station_id, pm25, unit)
-            VALUES (?, ?, ?)
-        """, (station_id, pm25, unit))
+            INSERT INTO AirQualityMeasurements (location_id, timestamp, parameter, value, unit)
+            VALUES (?, ?, ?, ?, ?)
+        """, (location_id, None, "pm25", pm25, unit))
 
     conn.commit()
 
@@ -299,11 +291,8 @@ def store_city_data(conn, city_data):
     """Insert GeoDB city metadata into GeoCities + CityDetails tables."""
     # TODO: Sarah fills this in
     cur = conn.cursor()
-    # Create the GeoCities table to store the city info
     cur.execute("""CREATE TABLE IF NOT EXISTS GeoCities (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, country TEXT, region TEXT, population INTEGER)""")
-    # Create the CityDetails table to store extra details in GeoCities
-    cur.execut("""CREATE TABLE IF NOT EXISTS CityDetails (id INTEGER PRIMARY KEY AUTOINCREMENT, geocity_id INTEGER, latitude REAL, longitude REAL, FOREIGN KEY (geocity_id) REFERENCES GeoCities(id))""")
-    # Loop through each city dictionary returned from fetch_city_data
+    cur.execute("""CREATE TABLE IF NOT EXISTS CityDetails (id INTEGER PRIMARY KEY AUTOINCREMENT, geocity_id INTEGER, latitude REAL, longitude REAL, FOREIGN KEY (geocity_id) REFERENCES GeoCities(id))""")
     for city in city_data:
         city_name = city.get("name")
         country = city.get("country")
@@ -311,19 +300,14 @@ def store_city_data(conn, city_data):
         population = city.get("population")
         latitude = city.get("latitude")
         longitude = city.get("longitude")
-        # Insert row into GeoCities
         cur.execute("""INSERT OR IGNORE INTO GeoCities (name, country, region, population) VALUES (?, ?, ?, ?)""", (city_name, country, region, population))
-        # ID of city in GeoCities
         cur.execute("""SELECT id FROM GeoCities WHERE name = ? AND country = ?""", (city_name, country))
         row = cur.fetchone()
-        # If can't find row then skip city
         if row is None:
             continue
         geocity_id = row[0]
-        # Insert row into CityDetails
         cur.execute("""INSERT INTO CityDetails (geocity_id, latitude, longitude) VALUES (?, ?, ?)""", (geocity_id, latitude, longitude))
-        # Save all inserts to database file
-        conn.commit()
+    conn.commit()
 
 # ============================================================
 # ANALYSIS
@@ -335,24 +319,26 @@ def calculate_city_stats(conn):
     """Combine weather, air quality, and city metadata into per-city stats."""
     cur = conn.cursor()
 
-    # NOTE: You may need to tweak table/column names to match your actual schema.
     query = """
         SELECT
-            c.name AS city,
+            c.city_name AS city,
             AVG(w.temperature) AS avg_temp,
-            AVG(aqm.pm25) AS avg_pm25,
-            g.population AS population
+            AVG(aqm.value) AS avg_pm25,
+            cd.population AS population
         FROM Cities AS c
         JOIN WeatherObservations AS w
             ON w.city_id = c.id
-        JOIN AirQualityStations AS aqs
-            ON aqs.city = c.name
+        JOIN AirQualityLocations AS aql
+            ON aql.city_name = c.city_name
         JOIN AirQualityMeasurements AS aqm
-            ON aqm.station_id = aqs.id
-        LEFT JOIN GeoCities AS g
-            ON g.name = c.name
-        GROUP BY c.name
-        ORDER BY c.name
+            ON aqm.location_id = aql.id
+           AND aqm.parameter = 'pm25'
+        LEFT JOIN GeoCities AS gc
+            ON gc.city_name = c.city_name
+        LEFT JOIN CityDetails AS cd
+            ON cd.geodb_id = gc.geodb_id
+        GROUP BY c.city_name
+        ORDER BY c.city_name
     """
 
     cur.execute(query)
@@ -497,13 +483,13 @@ def write_results_to_file(city_stats, filename="results.txt"):
     # TODO: April fills this in
     try:
         with open(filename, "w") as f:
-            f.write(f"City Statistics Results\n")
-            f.write(f"{'-'*40}\n")
+            f.write("City Statistics Results\n")
+            f.write("-" * 40 + "\n")
 
             for city in city_stats:
                 name = city.get("city")
                 population = city.get("population")
-                avg_temp = city.get("avg_temperature")
+                avg_temp = city.get("avg_temp")
                 avg_pm25 = city.get("avg_pm25")
                 aq_category = city.get("aq_category")
 
@@ -512,12 +498,11 @@ def write_results_to_file(city_stats, filename="results.txt"):
                 f.write(f"Average Temperature: {avg_temp}\n")
                 f.write(f"Average PM2.5: {avg_pm25}\n")
                 f.write(f"Air Quality Category: {aq_category}\n")
-                f.write(f"{'-'*40}\n")
+                f.write("-" * 40 + "\n")
 
             print(f"Results successfully written to {filename}")
     except Exception as e:
         print(f"Error writing results to file: {e}")
-
 
 # ============================================================
 # MAIN FUNCTION
@@ -529,10 +514,25 @@ def main():
 
     # TODO: Put the workflow here
     # TEMP: run April's tests
+
+    # April's tests
     test_fetch_weather()
     test_store_weather_data()
     test_plot_city_characteristics()
     test_write_results_to_file()
+
+    # Kyndal's tests
+    test_fetch_air_quality()
+    test_store_air_quality_data()
+    test_plot_temp_vs_pm25()
+
+    # Sarah's tests
+    test_fetch_city_data()
+    test_store_city_data()
+    test_plot_population_vs_pm25()
+
+    # Combined
+    test_calculate_city_stats()
 
 
 
