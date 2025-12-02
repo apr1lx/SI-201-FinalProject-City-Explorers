@@ -25,7 +25,7 @@ OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/"
 OPENAQ_BASE_URL = "https://api.openaq.org/v2/"
 
 # GeoDB Free GraphQL API (NO API KEY REQUIRED)
-GEODB_BASE_URL = "http://geodb-free-service.wirefreethought.com/graphql"
+GEODB_BASE_URL = "https://geodb-free-service.wirefreethought.com/graphql"
 
 # ============================================================
 # IMPORTS
@@ -105,49 +105,42 @@ def fetch_air_quality(city_list):
     """Fetch air quality (PM2.5) for each city from OpenAQ."""
     results = []
 
+    # If city_list is empty, just return []
+    if not city_list:
+        return results
+
     for city in city_list:
-        # Build the request parameters for OpenAQ
         params = {
             "city": city,
             "parameter": "pm25",
-            "limit": 1
+            "limit": 1,
+            "sort": "desc",
+            "order_by": "datetime",
         }
 
         try:
-            # Call the OpenAQ /latest endpoint
-            response = requests.get(OPENAQ_BASE_URL + "latest", params=params, timeout=10)
+            # OpenAQ: use /measurements instead of /latest (latest is 410 Gone now)
+            response = requests.get(OPENAQ_BASE_URL + "measurements", params=params, timeout=10)
             response.raise_for_status()
             data = response.json()
         except Exception as e:
-            # If anything goes wrong, print the error and skip this city
             print(f"Error fetching air quality for {city}: {e}")
             continue
 
-        # Make sure we actually got results back
         results_list = data.get("results", [])
         if not results_list:
             continue
 
-        first_result = results_list[0]
+        first = results_list[0]
 
-        # Measurements is a list of different pollutants; we want pm25
-        measurements = first_result.get("measurements", [])
-        pm25_value = None
-        pm25_unit = None
+        pm25_value = first.get("value")
+        pm25_unit = first.get("unit")
+        coords = first.get("coordinates", {})
+        location_name = first.get("location")
+        timestamp = first.get("date", {}).get("utc")
 
-        for m in measurements:
-            if m.get("parameter") == "pm25":
-                pm25_value = m.get("value")
-                pm25_unit = m.get("unit")
-                break
-
-        # If we never found a pm25 measurement, skip this city
         if pm25_value is None:
             continue
-
-        # Coordinates and location name for the station
-        coords = first_result.get("coordinates", {})
-        location_name = first_result.get("location")
 
         results.append({
             "city": city,
@@ -155,7 +148,8 @@ def fetch_air_quality(city_list):
             "latitude": coords.get("latitude"),
             "longitude": coords.get("longitude"),
             "pm25": pm25_value,
-            "unit": pm25_unit
+            "unit": pm25_unit,
+            "timestamp": timestamp,
         })
 
     return results
@@ -167,6 +161,9 @@ def fetch_city_data(limit=10, min_population=50000):
     Fetch city metadata (name, country, population, coordinates)
     from the GeoDB Free GraphQL API. No API key required.
     """
+    if limit <= 0:
+        return []
+
     query = f"""
     {{
       cities(limit: {limit}, offset: 0, minPopulation: {min_population}) {{
@@ -180,13 +177,16 @@ def fetch_city_data(limit=10, min_population=50000):
       }}
     }}
     """
-    response = requests.post(GEODB_BASE_URL, json={"query": query})
-    if response.status_code != 200:
-        print("Error fetching GeoDB Cities data:", response.text)
+
+    try:
+        response = requests.post(GEODB_BASE_URL, json={"query": query}, timeout=10)
+        response.raise_for_status()
+    except Exception as e:
+        print("Error fetching GeoDB Cities data:", e)
         return []
+
     data = response.json()
     return data.get("data", {}).get("cities", [])
-
 
 # ============================================================
 # STORE FUNCTIONS
@@ -291,22 +291,40 @@ def store_city_data(conn, city_data):
     """Insert GeoDB city metadata into GeoCities + CityDetails tables."""
     # TODO: Sarah fills this in
     cur = conn.cursor()
-    cur.execute("""CREATE TABLE IF NOT EXISTS GeoCities (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, country TEXT, region TEXT, population INTEGER)""")
-    cur.execute("""CREATE TABLE IF NOT EXISTS CityDetails (id INTEGER PRIMARY KEY AUTOINCREMENT, geocity_id INTEGER, latitude REAL, longitude REAL, FOREIGN KEY (geocity_id) REFERENCES GeoCities(id))""")
+
     for city in city_data:
+        geodb_id = city.get("id")
         city_name = city.get("name")
         country = city.get("country")
         region = city.get("region")
         population = city.get("population")
         latitude = city.get("latitude")
         longitude = city.get("longitude")
-        cur.execute("""INSERT OR IGNORE INTO GeoCities (name, country, region, population) VALUES (?, ?, ?, ?)""", (city_name, country, region, population))
-        cur.execute("""SELECT id FROM GeoCities WHERE name = ? AND country = ?""", (city_name, country))
-        row = cur.fetchone()
-        if row is None:
+
+        # Need at least an id + name to store the city
+        if geodb_id is None or city_name is None:
             continue
-        geocity_id = row[0]
-        cur.execute("""INSERT INTO CityDetails (geocity_id, latitude, longitude) VALUES (?, ?, ?)""", (geocity_id, latitude, longitude))
+
+        # Insert into GeoCities (basic city info)
+        cur.execute(
+            """
+            INSERT OR IGNORE INTO GeoCities
+                (geodb_id, city_name, country, region, latitude, longitude)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (geodb_id, city_name, country, region, latitude, longitude),
+        )
+
+        # Insert into CityDetails (population + other stats)
+        cur.execute(
+            """
+            INSERT OR IGNORE INTO CityDetails
+                (geodb_id, population, elevation, density)
+            VALUES (?, ?, ?, ?)
+            """,
+            (geodb_id, population, None, None),
+        )
+
     conn.commit()
 
 # ============================================================
@@ -508,28 +526,96 @@ def write_results_to_file(city_stats, filename="results.txt"):
 # MAIN FUNCTION
 # ============================================================
 
-def main():
-    """Run all steps of the project in order."""
+def run_tests():
+    """Run all test functions for April, Kyndal, and Sarah."""
     create_database("final_project.db")
 
     # April's tests
     test_fetch_weather()
     test_store_weather_data()
-    # test_plot_city_characteristics()   # run manually when you want to see the bar chart
+    # test_plot_city_characteristics()  # visualization test - skip for now
     test_write_results_to_file()
 
     # Kyndal's tests
     test_fetch_air_quality()
     test_store_air_quality_data()
-    # test_plot_temp_vs_pm25()           # run manually when you want to see the scatter
+    # test_plot_temp_vs_pm25()          # visualization test - skip for now
 
     # Sarah's tests
     test_fetch_city_data()
     test_store_city_data()
-    # test_plot_population_vs_pm25()     # run manually when you want the plot
+    # test_plot_population_vs_pm25()    # visualization test - skip for now
 
-    # Combined
+    # Combined test
     test_calculate_city_stats()
+
+
+def run_pipeline():
+    """
+    Real project workflow:
+    - create DB
+    - fetch + store data from all APIs
+    - compute city stats
+    - make visualizations (optional)
+    - write results to a text file
+    """
+    create_database("final_project.db")
+    conn = sqlite3.connect("final_project.db")
+
+    # 1) Choose cities (weather + AQ)
+    weather_cities = ["Ann Arbor,US", "Chicago,US", "New York,US"]
+    aq_cities = ["Ann Arbor", "Chicago", "New York"]
+
+    # 2) Fetch + store weather data
+    weather_data = fetch_weather(weather_cities)
+    store_weather_data(conn, weather_data)
+
+    # 3) Fetch + store air-quality data
+    aq_data = fetch_air_quality(aq_cities)
+    store_air_quality_data(conn, aq_data)
+
+    # 4) Fetch + store city metadata from GeoDB
+    city_data = fetch_city_data(limit=10, min_population=50000)
+    store_city_data(conn, city_data)
+
+    # 5) Compute combined stats
+    city_stats = calculate_city_stats(conn)
+
+    if not city_stats:
+        print("No city statistics were created. This is probably because the external APIs returned no (joinable) data.")
+        conn.close()
+        return
+
+    # 6) Add AQ categories
+    for c in city_stats:
+        pm = c.get("avg_pm25")
+        if pm is None:
+            category = None
+        elif pm < 12:
+            category = "Good"
+        elif pm < 35:
+            category = "Moderate"
+        else:
+            category = "Unhealthy"
+        c["aq_category"] = category
+
+    # 7) (optional) plots – keep commented for now
+    # plot_temp_vs_pm25(city_stats)
+    # plot_population_vs_pm25(city_stats)
+    # plot_city_characteristics(city_stats)
+
+    # 8) Write results to a text file
+    write_results_to_file(city_stats, filename="results.txt")
+
+    conn.close()
+
+def main():
+    """Entry point for the program."""
+    # For final submission, you probably want the real pipeline:
+    run_pipeline()
+
+    # If you ever want to run all tests instead:
+    # run_tests()
 
 
 ##test for merging
