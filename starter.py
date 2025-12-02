@@ -702,7 +702,40 @@ def test_plot_temp_vs_pm25():
 def test_fetch_city_data():
     """Test template for fetch_city_data (Sarah)."""
     # TODO: Valid GraphQL response, filtering, field structure
-    pass
+    # Case 1
+    result = fetch_city_data(limit=2, min_population=50000)
+    if not isinstance(result, list):
+        print("FAIL: fetch_city_data did not return a list.")
+        return
+
+    if len(result) > 0:
+        first = result[0]
+        required_fields = ["name", "country", "population", "latitude", "longitude"]
+        missing = [f for f in required_fields if f not in first]
+        if missing:
+            print("FAIL: Missing fields:", missing)
+        else:
+            print("PASS: Valid structure for small limit.")
+    # Case 2
+    result2 = fetch_city_data(limit=5, min_population=200000)
+    if isinstance(result2, list) and len(result2) <= 5:
+        print("PASS: Limit filtering works.")
+    else:
+        print("FAIL: Limit filtering issue.")
+    # Edge case 1
+    r_zero = fetch_city_data(limit=0)
+    if isinstance(r_zero, list) and len(r_zero) == 0:
+        print("PASS: limit=0 returns empty list.")
+    else:
+        print("FAIL: limit=0 should return empty list.")
+    # Edge case 2
+    r_high = fetch_city_data(limit=10, min_population=999999999)
+    if isinstance(r_high, list) and len(r_high) == 0:
+        print("PASS: high population threshold returns empty list.")
+    else:
+        print("FAIL: huge min_population should return empty list.")
+    print()
+
 
 def test_store_city_data():
     """Test template for store_city_data (Sarah)."""
