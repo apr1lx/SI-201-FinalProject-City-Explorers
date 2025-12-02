@@ -933,7 +933,90 @@ def test_plot_population_vs_pm25():
 def test_calculate_city_stats():
     """Test template for calculate_city_stats (Kyndal + Sarah)."""
     # TODO: Join all three APIs, compute averages & metrics
-    pass
+    print("Running test_calculate_city_stats...")
+
+    test_db_name = "test_city_stats.db"
+    create_database(test_db_name)
+
+    conn = sqlite3.connect(test_db_name)
+    cur = conn.cursor()
+
+    cur.execute(
+        "INSERT INTO Cities (city_name, country, latitude, longitude) VALUES (?, ?, ?, ?)",
+        ("Test City", "TC", 1.23, 4.56)
+    )
+    city_id = cur.lastrowid
+
+    cur.execute(
+        "INSERT INTO WeatherObservations (city_id, timestamp, temperature, feels_like, humidity, wind_speed, weather_main) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (city_id, "2024-01-01T00:00", 10.0, 9.0, 50, 3.0, "Clear")
+    )
+    cur.execute(
+        "INSERT INTO WeatherObservations (city_id, timestamp, temperature, feels_like, humidity, wind_speed, weather_main) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (city_id, "2024-01-01T01:00", 20.0, 19.0, 55, 4.0, "Clouds")
+    )
+
+    cur.execute(
+        "INSERT INTO AirQualityLocations (city_name, location_name, country, latitude, longitude) VALUES (?, ?, ?, ?, ?)",
+        ("Test City", "Test Station", "TC", 1.23, 4.56)
+    )
+    location_id = cur.lastrowid
+
+    cur.execute(
+        "INSERT INTO AirQualityMeasurements (location_id, timestamp, parameter, value, unit) VALUES (?, ?, ?, ?, ?)",
+        (location_id, "2024-01-01T00:00", "pm25", 10.0, "ug/m3")
+    )
+    cur.execute(
+        "INSERT INTO AirQualityMeasurements (location_id, timestamp, parameter, value, unit) VALUES (?, ?, ?, ?, ?)",
+        (location_id, "2024-01-01T01:00", "pm25", 30.0, "ug/m3")
+    )
+
+    geodb_id = "geo-1"
+    cur.execute(
+        "INSERT INTO GeoCities (geodb_id, city_name, country, region, latitude, longitude) VALUES (?, ?, ?, ?, ?, ?)",
+        (geodb_id, "Test City", "TC", "Test Region", 1.23, 4.56)
+    )
+    cur.execute(
+        "INSERT INTO CityDetails (geodb_id, population, elevation, density) VALUES (?, ?, ?, ?)",
+        (geodb_id, 100000, 100, 1000.0)
+    )
+
+    conn.commit()
+
+    try:
+        stats = calculate_city_stats(conn)
+
+        if not isinstance(stats, list):
+            print("FAIL: calculate_city_stats did not return a list.")
+            conn.close()
+            return
+
+        if not stats:
+            print("FAIL: calculate_city_stats returned an empty list.")
+            conn.close()
+            return
+
+        first = stats[0]
+
+        needed_keys = ["city", "population", "avg_temp", "avg_pm25"]
+        missing = [k for k in needed_keys if k not in first]
+        if missing:
+            print("FAIL: calculate_city_stats result missing keys:", missing)
+            conn.close()
+            return
+
+        if first.get("city") != "Test City":
+            print("FAIL: calculate_city_stats city name is incorrect.")
+            conn.close()
+            return
+
+        print("PASS: test_calculate_city_stats")
+
+    except Exception as e:
+        print("FAIL: calculate_city_stats raised an exception:", e)
+
+    conn.close()
+    print()
 
 
 # ============================================================
