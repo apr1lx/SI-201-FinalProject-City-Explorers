@@ -683,17 +683,123 @@ def test_write_results_to_file():
 def test_fetch_air_quality():
     """Test template for fetch_air_quality (Kyndal)."""
     # TODO: Valid response, empty dataset handling
-    pass
+    print("Running test_fetch_air_quality...")
+
+    empty_result = fetch_air_quality([])
+    if empty_result != []:
+        print("FAIL: fetch_air_quality should return [] for empty input.")
+        return
+
+    cities = ["Ann Arbor"]
+    try:
+        result = fetch_air_quality(cities)
+    except Exception as e:
+        print("FAIL: fetch_air_quality raised an exception:", e)
+        return
+
+    if not isinstance(result, list):
+        print("FAIL: fetch_air_quality did not return a list.")
+        return
+
+    if result:
+        first = result[0]
+        if not isinstance(first, dict):
+            print("FAIL: fetch_air_quality returned non-dict elements.")
+            return
+        if "city" not in first or "pm25" not in first:
+            print("FAIL: fetch_air_quality missing expected keys.")
+            return
+        if not isinstance(first["pm25"], (int, float)):
+            print("FAIL: pm25 is not numeric.")
+            return
+
+    print("PASS: test_fetch_air_quality")
+    print()
 
 def test_store_air_quality_data():
     """Test template for store_air_quality_data (Kyndal)."""
     # TODO: Insert station + measurement rows
-    pass
+    print("Running test_store_air_quality_data...")
+
+    conn = sqlite3.connect(":memory:")
+
+    try:
+        aq_data = [
+            {
+                "city": "Ann Arbor",
+                "location": "Station AA",
+                "latitude": 42.28,
+                "longitude": -83.74,
+                "pm25": 12.5,
+                "unit": "ug/m3",
+            },
+            {
+                "city": "Chicago",
+                "location": "Station CHI",
+                "latitude": 41.88,
+                "longitude": -87.63,
+                "pm25": 25.0,
+                "unit": "ug/m3",
+            },
+        ]
+
+        store_air_quality_data(conn, aq_data)
+        cur = conn.cursor()
+
+        cur.execute("SELECT city_name, location_name FROM AirQualityLocations")
+        stations = cur.fetchall()
+
+        if len(stations) != 2:
+            print("FAIL: Expected 2 stations inserted.")
+            conn.close()
+            return
+
+        station_cities = {row[0] for row in stations}
+        if "Ann Arbor" not in station_cities or "Chicago" not in station_cities:
+            print("FAIL: Missing expected station cities.")
+            conn.close()
+            return
+
+        cur.execute("SELECT value FROM AirQualityMeasurements")
+        measurements = cur.fetchall()
+
+        if len(measurements) != 2:
+            print("FAIL: Expected 2 measurements inserted.")
+            conn.close()
+            return
+
+        pm_values = {row[0] for row in measurements}
+        if 12.5 not in pm_values or 25.0 not in pm_values:
+            print("FAIL: PM2.5 values not inserted correctly.")
+            conn.close()
+            return
+
+        print("PASS: test_store_air_quality_data")
+
+    finally:
+        conn.close()
+
+    print()
+
 
 def test_plot_temp_vs_pm25():
     """Test template for plot_temp_vs_pm25 (Kyndal)."""
     # TODO: Scatter creation, missing values
-    pass
+    print("Running test_plot_temp_vs_pm25...")
+
+    city_stats = [
+        {"city": "Ann Arbor", "avg_temp": 12.0, "avg_pm25": 15.0},
+        {"city": "Chicago", "avg_temp": 8.0, "avg_pm25": 25.0},
+        {"city": "Unknown City", "avg_temp": None, "avg_pm25": None},
+    ]
+
+    try:
+        plot_temp_vs_pm25(city_stats)
+        print("PASS: test_plot_temp_vs_pm25")
+    except Exception as e:
+        print("FAIL: plot_temp_vs_pm25 raised an exception:", e)
+
+    print()
 
 
 # -----------------------------
