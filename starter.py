@@ -10,7 +10,7 @@
 OPENWEATHER_API_KEY = "adb50d52c8775272ca4a7fc399f99e2f"
 
 # OpenAQ does NOT require an API key
-OPENAQ_API_KEY = None
+OPENAQ_API_KEY = "6948df237b69d167ad713141df83afc984fd2996c3932a9e4a630cef0cde243b"
 
 # GeoDB Free GraphQL API does NOT require any key
 GEODB_API_KEY = None
@@ -22,20 +22,26 @@ GEODB_API_KEY = None
 OPENWEATHER_BASE_URL = "https://api.openweathermap.org/data/2.5/"
 
 # OpenAQ (Air Quality)
-OPENAQ_BASE_URL = "https://api.openaq.org/v2/"
+OPENAQ_BASE_URL = "https://api.openaq.org/v3/"
 
 # GeoDB Free GraphQL API (NO API KEY REQUIRED)
-GEODB_BASE_URL = "https://geodb-free-service.wirefreethought.com/graphql"
+GEODB_BASE_URL = "http://geodb-free-service.wirefreethought.com/v1/geo"
 
 # ============================================================
 # IMPORTS
 # ============================================================
+import os
 import requests
 import sqlite3
 import json
 from create_database import create_database
 import matplotlib.pyplot as plt
 
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+TEST_OUTPUT_DIR = "test_outputs"
+if not os.path.exists(TEST_OUTPUT_DIR):
+    os.makedirs(TEST_OUTPUT_DIR)
 
 # ============================================================
 # FETCH FUNCTIONS (to be completed by each team member)
@@ -105,22 +111,20 @@ def fetch_air_quality(city_list):
     """Fetch air quality (PM2.5) for each city from OpenAQ."""
     results = []
 
-    # If city_list is empty, just return []
-    if not city_list:
+    # If you somehow call this without a key, just return empty
+    if not OPENAQ_API_KEY:
+        print("No OpenAQ API key set. Set OPENAQ_API_KEY at the top of the file.")
         return results
 
-    for city in city_list:
-        params = {
-            "city": city,
-            "parameter": "pm25",
-            "limit": 1,
-            "sort": "desc",
-            "order_by": "datetime",
-        }
+    headers = {
+        "X-API-Key": OPENAQ_API_KEY
+    }
 
+    for city in city_list:
         try:
-            # OpenAQ: use /measurements instead of /latest (latest is 410 Gone now)
-            response = requests.get(OPENAQ_BASE_URL + "measurements", params=params, timeout=10)
+            # PM2.5 is parameter ID 2 in OpenAQ
+            url = OPENAQ_BASE_URL + "parameters/2/latest"
+            response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             data = response.json()
         except Exception as e:
@@ -132,24 +136,19 @@ def fetch_air_quality(city_list):
             continue
 
         first = results_list[0]
+        value = first.get("value")
+        coords = first.get("coordinates", {}) or {}
 
-        pm25_value = first.get("value")
-        pm25_unit = first.get("unit")
-        coords = first.get("coordinates", {})
-        location_name = first.get("location")
-        timestamp = first.get("date", {}).get("utc")
-
-        if pm25_value is None:
+        if value is None:
             continue
 
         results.append({
             "city": city,
-            "location": location_name,
+            "location": "OpenAQ PM2.5 sensor",
             "latitude": coords.get("latitude"),
             "longitude": coords.get("longitude"),
-            "pm25": pm25_value,
-            "unit": pm25_unit,
-            "timestamp": timestamp,
+            "pm25": value,
+            "unit": "µg/m³"
         })
 
     return results
@@ -161,33 +160,40 @@ def fetch_city_data(limit=10, min_population=50000):
     Fetch city metadata (name, country, population, coordinates)
     from the GeoDB Free GraphQL API. No API key required.
     """
-    if limit <= 0:
-        return []
-
-    query = f"""
-    {{
-      cities(limit: {limit}, offset: 0, minPopulation: {min_population}) {{
-        id
-        name
-        country
-        region
-        population
-        latitude
-        longitude
-      }}
-    }}
-    """
+    url = f"{GEODB_BASE_URL}/cities"
+    params = {
+        "limit": limit,
+        "offset": 0,
+        "minPopulation": min_population,
+        "sort": "-population",      # biggest cities first
+        "hateoasMode": "off",       # simpler JSON
+    }
 
     try:
-        response = requests.post(GEODB_BASE_URL, json={"query": query}, timeout=10)
+        response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
     except Exception as e:
         print("Error fetching GeoDB Cities data:", e)
         return []
 
     data = response.json()
-    return data.get("data", {}).get("cities", [])
 
+    cities = []
+    for item in data.get("data", []):
+        # Some docs use "city", some "name" – try both.
+        city_name = item.get("city") or item.get("name")
+
+        cities.append({
+            "geodb_id": item.get("id"),
+            "name": city_name,
+            "country": item.get("country") or item.get("countryCode"),
+            "region": item.get("region"),
+            "population": item.get("population"),
+            "latitude": item.get("latitude"),
+            "longitude": item.get("longitude"),
+        })
+
+    return cities
 # ============================================================
 # STORE FUNCTIONS
 # ============================================================
@@ -293,37 +299,31 @@ def store_city_data(conn, city_data):
     cur = conn.cursor()
 
     for city in city_data:
-        geodb_id = city.get("id")
-        city_name = city.get("name")
+        geodb_id = city.get("geodb_id")
+        name = city.get("name")
         country = city.get("country")
         region = city.get("region")
         population = city.get("population")
         latitude = city.get("latitude")
         longitude = city.get("longitude")
 
-        # Need at least an id + name to store the city
-        if geodb_id is None or city_name is None:
-            continue
+        # If we somehow don't have a geodb_id, make a simple fallback
+        if geodb_id is None:
+            geodb_id = f"{name}-{country}"
 
-        # Insert into GeoCities (basic city info)
-        cur.execute(
-            """
+        # Insert basic city info
+        cur.execute("""
             INSERT OR IGNORE INTO GeoCities
                 (geodb_id, city_name, country, region, latitude, longitude)
             VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (geodb_id, city_name, country, region, latitude, longitude),
-        )
+        """, (geodb_id, name, country, region, latitude, longitude))
 
-        # Insert into CityDetails (population + other stats)
-        cur.execute(
-            """
-            INSERT OR IGNORE INTO CityDetails
+        # Insert or update extra details (population etc.)
+        cur.execute("""
+            INSERT OR REPLACE INTO CityDetails
                 (geodb_id, population, elevation, density)
             VALUES (?, ?, ?, ?)
-            """,
-            (geodb_id, population, None, None),
-        )
+        """, (geodb_id, population, None, None))
 
     conn.commit()
 
@@ -661,7 +661,7 @@ def test_store_weather_data():
     print("Running test_store_weather_data...")
 
     # Create a separate test database so we don't touch the main one
-    test_db_name = "test_weather.db"
+    test_db_name = os.path.join(TEST_OUTPUT_DIR, "test_weather.db")
     create_database(test_db_name)
 
     conn = sqlite3.connect(test_db_name)
@@ -729,7 +729,8 @@ def test_write_results_to_file():
     # TODO: File creation + formatting
     print("Running test_write_results_to_file...")
 
-    test_filename = "test_results.txt"
+    test_filename = os.path.join(TEST_OUTPUT_DIR, "test_results.txt")
+
 
     # Small sample city_stats list
     sample_city_stats = [
@@ -1018,7 +1019,7 @@ def test_calculate_city_stats():
     # TODO: Join all three APIs, compute averages & metrics
     print("Running test_calculate_city_stats...")
 
-    test_db_name = "test_city_stats.db"
+    test_db_name = os.path.join(TEST_OUTPUT_DIR, "test_city_stats.db")
     create_database(test_db_name)
 
     conn = sqlite3.connect(test_db_name)
