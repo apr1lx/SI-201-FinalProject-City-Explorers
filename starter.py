@@ -528,7 +528,12 @@ def main():
     create_database("final_project.db")
 
     # TODO: Put the workflow here
-    pass
+    # TEMP: run April's tests
+    test_fetch_weather()
+    test_store_weather_data()
+    test_plot_city_characteristics()
+    test_write_results_to_file()
+
 
 
 # ============================================================
@@ -541,22 +546,135 @@ def main():
 def test_fetch_weather():
     """Test template for fetch_weather (April)."""
     # TODO: Valid city list, invalid city handling, response structure
-    pass
+    # One valid city and one fake city name
+    test_cities = ["Ann Arbor,US", "ThisCityDoesNotExist"]
+
+    weather_data = fetch_weather(test_cities)
+
+    # Check that we got a list back
+    if not isinstance(weather_data, list):
+        print("FAIL: fetch_weather did not return a list.")
+        return
+
+    if len(weather_data) == 0:
+        print("WARN: fetch_weather returned an empty list. "
+              "Check your OpenWeather API key or internet connection.")
+        return
+
+    # Look at the first item and check for some expected keys
+    first = weather_data[0]
+    expected_keys = ["city_name", "country", "temperature", "humidity"]
+
+    missing = [key for key in expected_keys if key not in first]
+    if missing:
+        print("FAIL: fetch_weather result is missing keys:", missing)
+    else:
+        print("PASS: fetch_weather returned a list with the expected structure.")
+    print()  # blank line for readability
 
 def test_store_weather_data():
     """Test template for store_weather_data (April)."""
     # TODO: Insert rows, link to Cities table
-    pass
+    print("Running test_store_weather_data...")
+
+    # Create a separate test database so we don't touch the main one
+    test_db_name = "test_weather.db"
+    create_database(test_db_name)
+
+    conn = sqlite3.connect(test_db_name)
+    cur = conn.cursor()
+
+    # Make a small fake weather_data list like fetch_weather would return
+    fake_weather = [
+        {
+            "city_name": "Test City",
+            "country": "TC",
+            "latitude": 1.23,
+            "longitude": 4.56,
+            "timestamp": 1234567890,
+            "temperature": 20.5,
+            "feels_like": 19.0,
+            "humidity": 50,
+            "wind_speed": 3.2,
+            "weather_main": "Clear"
+        }
+    ]
+
+    # Call the function we are testing
+    store_weather_data(conn, fake_weather)
+
+    # Check that something was inserted into Cities
+    cur.execute("SELECT COUNT(*) FROM Cities WHERE city_name = ?", ("Test City",))
+    city_count = cur.fetchone()[0]
+
+    # Check that something was inserted into WeatherObservations
+    cur.execute("SELECT COUNT(*) FROM WeatherObservations")
+    weather_count = cur.fetchone()[0]
+
+    if city_count > 0 and weather_count > 0:
+        print("PASS: store_weather_data inserted rows into Cities and WeatherObservations.")
+    else:
+        print("FAIL: store_weather_data did not insert expected rows.")
+
+    conn.close()
+    print()  # blank line
+
 
 def test_plot_city_characteristics():
     """Test template for plot_city_characteristics (April)."""
     # TODO: Chart creation, missing data handling
-    pass
+    print("Running test_plot_city_characteristics...")
+
+    # Simple fake data to plot
+    sample_city_stats = [
+        {"city": "City A", "population": 100000, "aq_category": "Good"},
+        {"city": "City B", "population": 200000, "aq_category": "Moderate"},
+        {"city": "City C", "population": 150000, "aq_category": "Unhealthy"},
+    ]
+
+    try:
+        plot_city_characteristics(sample_city_stats)
+        print("PASS: plot_city_characteristics ran without errors.")
+    except Exception as e:
+        print("FAIL: plot_city_characteristics raised an error:", e)
+
+    print()  # blank line
+
 
 def test_write_results_to_file():
     """Test template for write_results_to_file (April)."""
     # TODO: File creation + formatting
-    pass
+    print("Running test_write_results_to_file...")
+
+    test_filename = "test_results.txt"
+
+    # Small sample city_stats list
+    sample_city_stats = [
+        {
+            "city": "Sample City",
+            "population": 123456,
+            "avg_temp": 15.5,
+            "avg_pm25": 7.8,
+            "aq_category": "Good"
+        }
+    ]
+
+    # Call the function we are testing
+    write_results_to_file(sample_city_stats, filename=test_filename)
+
+    # Try to open the file and read a bit of it
+    try:
+        with open(test_filename, "r") as f:
+            contents = f.read()
+
+        if "Sample City" in contents:
+            print("PASS: write_results_to_file created the file and wrote city data.")
+        else:
+            print("FAIL: test_results.txt does not seem to contain the expected city name.")
+    except FileNotFoundError:
+        print("FAIL: test_results.txt did not create the file:", test_filename)
+
+    print()  # blank line
 
 
 # -----------------------------
