@@ -790,7 +790,35 @@ def test_store_city_data():
 def test_plot_population_vs_pm25():
     """Test template for plot_population_vs_pm25 (Sarah)."""
     # TODO: Scatter creation, missing population
-    pass
+    print("Running test_plot_population_vs_pm25...")
+    # Case 1
+    stats1 = [{"city": "Paris", "population": 2000000, "avg_pm25": 12.5}, {"city": "Tokyo", "population": 9000000, "avg_pm25": 20.1}]
+    try:
+        plot_population_vs_pm25(stats1)
+        print("PASS: Basic scatter plot ran without error.")
+    except Exception as e:
+        print("FAIL: scatter plot raised an error:", e)
+    # Case 2
+    stats2 = [{"city": f"City{i}", "population": 50000 + i * 1000, "avg_pm25": 5 + i} for i in range(10)]
+    try:
+        plot_population_vs_pm25(stats2)
+        print("PASS: Large dataset plotted successfully.")
+    except Exception as e:
+        print("FAIL: large dataset plot raised an error:", e)
+    # Edge case 1 (missing population)
+    stats3 = [{"city": "A", "population": None, "avg_pm25": 12}, {"city": "B", "population": 300000, "avg_pm25": 25}]
+    try:
+        plot_population_vs_pm25(stats3)
+        print("PASS: Missing population handled correctly.")
+    except Exception as e:
+        print("FAIL: Missing population caused error:", e)
+    # Edge case 2 (empty list)
+    try:
+        plot_population_vs_pm25([])
+        print("PASS: Empty list handled safely.")
+    except Exception as e:
+        print("FAIL: Empty list caused error:", e)
+    print()
 
 
 # -----------------------------
