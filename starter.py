@@ -512,24 +512,21 @@ def main():
     """Run all steps of the project in order."""
     create_database("final_project.db")
 
-    # TODO: Put the workflow here
-    # TEMP: run April's tests
-
     # April's tests
     test_fetch_weather()
     test_store_weather_data()
-    test_plot_city_characteristics()
+    # test_plot_city_characteristics()   # run manually when you want to see the bar chart
     test_write_results_to_file()
 
     # Kyndal's tests
     test_fetch_air_quality()
     test_store_air_quality_data()
-    test_plot_temp_vs_pm25()
+    # test_plot_temp_vs_pm25()           # run manually when you want to see the scatter
 
     # Sarah's tests
     test_fetch_city_data()
     test_store_city_data()
-    test_plot_population_vs_pm25()
+    # test_plot_population_vs_pm25()     # run manually when you want the plot
 
     # Combined
     test_calculate_city_stats()
