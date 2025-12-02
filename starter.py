@@ -740,7 +740,52 @@ def test_fetch_city_data():
 def test_store_city_data():
     """Test template for store_city_data (Sarah)."""
     # TODO: Insert GeoCities + CityDetails rows
-    pass
+    print("Running test_store_city_data...")
+    conn = sqlite3.connect(":memory:")
+    cur = conn.cursor()
+    # Manually create tables
+    cur.execute("CREATE TABLE GeoCities (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, country TEXT, region TEXT, population INTEGER)")
+    cur.execute("CREATE TABLE CityDetails (id INTEGER PRIMARY KEY AUTOINCREMENT, geocity_id INTEGER, latitude REAL, longitude REAL)")
+    # Case 1
+    sample_data = [{"name": "Paris", "country": "France", "region": "Ile-de-France", "population": 2000000, "latitude": 48.85, "longitude": 2.35}, {"name": "Tokyo", "country": "Japan", "region": "Kanto", "population": 9000000, "latitude": 35.68, "longitude": 139.65}]
+    store_city_data(conn, sample_data)
+    cur.execute("SELECT COUNT(*) FROM GeoCities")
+    city_count = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM CityDetails")
+    detail_count = cur.fetchone()[0]
+    if city_count == 2 and detail_count == 2:
+        print("PASS: store_city_data inserted two cities.")
+    else:
+        print("FAIL: store_city_data did not insert expected rows.")
+    # Case 2
+    cur.execute("SELECT name, population FROM GeoCities WHERE name='Paris'")
+    row = cur.fetchone()
+    if row and row[0] == "Paris" and row[1] == 2000000:
+        print("PASS: Paris stored correctly.")
+    else:
+        print("FAIL: Paris not stored correctly.")
+    # Edge case 1 (empty list)
+    conn2 = sqlite3.connect(":memory:")
+    c2 = conn2.cursor()
+    c2.execute("CREATE TABLE GeoCities (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, country TEXT, region TEXT, population INTEGER)")
+    c2.execute("CREATE TABLE CityDetails (id INTEGER PRIMARY KEY AUTOINCREMENT, geocity_id INTEGER, latitude REAL, longitude REAL)")
+    store_city_data(conn2, [])
+    c2.execute("SELECT COUNT(*) FROM GeoCities")
+    if c2.fetchone()[0] == 0:
+        print("PASS: empty city_data inserts nothing.")
+    else:
+        print("FAIL: empty city_data should not insert anything.")
+    # Edge case 2 (missing fields)
+    conn3 = sqlite3.connect(":memory:")
+    c3 = conn3.cursor()
+    c3.execute("CREATE TABLE GeoCities (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, country TEXT, region TEXT, population INTEGER)")
+    c3.execute("CREATE TABLE CityDetails (id INTEGER PRIMARY KEY AUTOINCREMENT, geocity_id INTEGER, latitude REAL, longitude REAL)")
+    try:
+        store_city_data(conn3, [{"name": "Nowhere"}])
+        print("PASS: store_city_data handled missing fields without crashing.")
+    except Exception as e:
+        print("FAIL: store_city_data crashed on missing fields:", e)
+    print()
 
 def test_plot_population_vs_pm25():
     """Test template for plot_population_vs_pm25 (Sarah)."""
