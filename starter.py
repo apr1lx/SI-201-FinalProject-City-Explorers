@@ -37,6 +37,40 @@ import json
 from create_database import create_database
 import matplotlib.pyplot as plt
 
+from analysis_visualizations import (
+    calculate_city_stats,
+    plot_temp_vs_pm25,
+    plot_population_vs_pm25,
+    plot_city_characteristics,
+    write_results_to_file,
+)
+
+CITY_PAIRS = [
+    ("Ann Arbor,US", "Ann Arbor"),
+    ("Chicago,US", "Chicago"),
+    ("New York,US", "New York"),
+    ("Los Angeles,US", "Los Angeles"),
+    ("San Francisco,US", "San Francisco"),
+    ("Houston,US", "Houston"),
+    ("Dallas,US", "Dallas"),
+    ("Miami,US", "Miami"),
+    ("Seattle,US", "Seattle"),
+    ("Boston,US", "Boston"),
+    ("Phoenix,US", "Phoenix"),
+    ("Philadelphia,US", "Philadelphia"),
+    ("Atlanta,US", "Atlanta"),
+    ("Denver,US", "Denver"),
+    ("San Diego,US", "San Diego"),
+    ("Austin,US", "Austin"),
+    ("Portland,US", "Portland"),
+    ("Tampa,US", "Tampa"),
+    ("Orlando,US", "Orlando"),
+    ("Las Vegas,US", "Las Vegas"),
+]
+
+BATCH_SIZE = 25
+PROGRESS_FILE = "progress.json"
+
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 TEST_OUTPUT_DIR = "test_outputs"
@@ -331,196 +365,13 @@ def store_city_data(conn, city_data):
 # ANALYSIS
 # ============================================================
 
-def calculate_city_stats(conn):
-    """Combine weather, air quality, and city metadata into per-city stats."""
-    # TODO: Kyndal + Sarah fill this in
-    """Combine weather, air quality, and city metadata into per-city stats."""
-    cur = conn.cursor()
 
-    query = """
-        SELECT
-            c.city_name AS city,
-            AVG(w.temperature) AS avg_temp,
-            AVG(aqm.value) AS avg_pm25,
-            cd.population AS population
-        FROM Cities AS c
-        JOIN WeatherObservations AS w
-            ON w.city_id = c.id
-        JOIN AirQualityLocations AS aql
-            ON aql.city_name = c.city_name
-        JOIN AirQualityMeasurements AS aqm
-            ON aqm.location_id = aql.id
-           AND aqm.parameter = 'pm25'
-        LEFT JOIN GeoCities AS gc
-            ON gc.city_name = c.city_name
-        LEFT JOIN CityDetails AS cd
-            ON cd.geodb_id = gc.geodb_id
-        GROUP BY c.city_name
-        ORDER BY c.city_name
-    """
-
-    cur.execute(query)
-    rows = cur.fetchall()
-
-    city_stats = []
-    for row in rows:
-        city_stats.append({
-            "city": row[0],
-            "avg_temp": row[1],
-            "avg_pm25": row[2],
-            "population": row[3]
-        })
-
-    return city_stats
 
 
 # ============================================================
 # VISUALIZATIONS
 # ============================================================
 
-def plot_temp_vs_pm25(city_stats):
-    """Scatter plot of avg temperature vs avg PM2.5."""
-    # TODO: Kyndal fills this in
-    # Filter out any cities that are missing temp or pm25
-    temps = []
-    pm25_values = []
-    labels = []
-
-    for city_info in city_stats:
-        avg_temp = city_info.get("avg_temp")
-        avg_pm25 = city_info.get("avg_pm25")
-
-        if avg_temp is None or avg_pm25 is None:
-            continue
-
-        temps.append(avg_temp)
-        pm25_values.append(avg_pm25)
-        labels.append(city_info.get("city"))
-
-    # Nothing to plot? Just return.
-    if not temps or not pm25_values:
-        print("No data available to plot temperature vs PM2.5.")
-        return
-
-    plt.figure()
-    plt.scatter(temps, pm25_values)
-
-    # Label each point with the city name (small text so it doesn't get too messy)
-    for x, y, label in zip(temps, pm25_values, labels):
-        plt.text(x, y, label, fontsize=8)
-
-    plt.xlabel("Average Temperature")
-    plt.ylabel("Average PM2.5")
-    plt.title("Average Temperature vs Average PM2.5 by City")
-    plt.tight_layout()
-    plt.show()
-
-
-
-def plot_population_vs_pm25(city_stats):
-    """Scatter plot of population vs PM2.5."""
-    # TODO: Sarah fills this in
-    # Make empty lists to store the values to plot
-    populations = []
-    pm25_values = []
-    labels = []
-    # Go through each city's stats from the database
-    for city in city_stats:
-        pop = city.get("population")
-        pm25 = city.get("avg_pm25")
-        # Skip cities that are missing population or PM2.5
-        if pop is None or pm25 is None:
-            continue
-        populations.append(pop)
-        pm25_values.append(pm25)
-        labels.append(city.get("city"))
-    # If nothing valid to plot print a message
-    if not populations or not pm25_values:
-        print("Not enough city data to plot Population vs PM2.5.")
-        return
-    # Make the scatter plot
-    plt.figure()
-    plt.scatter(populations, pm25_values)
-    # Add labels nex to each dot for each city
-    for x, y, label in zip(populations, pm25_values, labels):
-        plt.text(x, y, label, fontsize=7)
-    # Label the axes and title
-    plt.xlabel("Population")
-    plt.ylabel("Average PM2.5")
-    plt.title("City Population vs PM2.5 Levels")
-    # Adjust layout so everything fits
-    plt.tight_layout()
-    plt.show()
-
-
-def plot_city_characteristics(city_stats):
-    """Bar chart of city characteristics (e.g., population or elevation) with air-quality categories."""
-    # TODO: April fills this in
-    city_labels = []
-    populations = []
-
-    for city in city_stats:
-        city_name = city.get("city")
-        population = city.get("population")    
-        aq_category = city.get("aq_category")
-
-        if population is None:
-            continue 
-
-        if aq_category is not None:
-            label = f"{city_name} ({aq_category})"
-        else:
-            label = city_name
-
-        city_labels.append(label)
-        populations.append(population)
-
-    if not populations:
-        print("No valid population data to plot.")
-        return
-    
-    plt.figure()
-    x_positions = range(len(city_labels))
-    plt.bar(x_positions, populations)
-    plt.xticks(x_positions, city_labels, rotation=45, ha='right')
-    plt.xlabel("Cities (with AQ Category)")
-    plt.ylabel("Population")
-    plt.title("City Populations with Air Quality Categories")
-    plt.tight_layout()
-    plt.show()
-
-
-
-
-# ============================================================
-# WRITE RESULTS TO FILE
-# ============================================================
-
-def write_results_to_file(city_stats, filename="results.txt"):
-    """Write final calculated statistics to a text file."""
-    # TODO: April fills this in
-    try:
-        with open(filename, "w") as f:
-            f.write("City Statistics Results\n")
-            f.write("-" * 40 + "\n")
-
-            for city in city_stats:
-                name = city.get("city")
-                population = city.get("population")
-                avg_temp = city.get("avg_temp")
-                avg_pm25 = city.get("avg_pm25")
-                aq_category = city.get("aq_category")
-
-                f.write(f"City: {name}\n")
-                f.write(f"Population: {population}\n")
-                f.write(f"Average Temperature: {avg_temp}\n")
-                f.write(f"Average PM2.5: {avg_pm25}\n")
-                f.write(f"Air Quality Category: {aq_category}\n")
-                f.write("-" * 40 + "\n")
-
-            print(f"Results successfully written to {filename}")
-    except Exception as e:
-        print(f"Error writing results to file: {e}")
 
 # ============================================================
 # MAIN FUNCTION
@@ -566,13 +417,30 @@ def run_pipeline():
     weather_cities = ["Ann Arbor,US", "Chicago,US", "New York,US"]
     aq_cities = ["Ann Arbor", "Chicago", "New York"]
 
-    # 2) Fetch + store weather data
+    # 2) Loop through city pairs in batches
+    for start in range(0, len(CITY_PAIRS), BATCH_SIZE):
+        batch = CITY_PAIRS[start : start + BATCH_SIZE]
+    
+    # Split pairs into two lists
+    weather_cities = [w for w, aq in batch]
+    aq_cities = [aq for w, aq in batch]
+
+    print(f"\nProcessing batch {start // BATCH_SIZE + 1}...")
+    
+    # Weather
     weather_data = fetch_weather(weather_cities)
     store_weather_data(conn, weather_data)
 
-    # 3) Fetch + store air-quality data
+    # Air quality
     aq_data = fetch_air_quality(aq_cities)
     store_air_quality_data(conn, aq_data)
+
+    # Save progress (so if code crashes you can resume)
+    with open(PROGRESS_FILE, "w") as f:
+        f.write(str(start + BATCH_SIZE))
+
+    print("Batch done.")
+
 
     # 4) Fetch + store city metadata from GeoDB
     city_data = fetch_city_data(limit=10, min_population=50000)
