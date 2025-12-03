@@ -603,15 +603,15 @@ def run_pipeline():
      # 6) Add AQ categories
     for c in city_stats:
         pm = c.get("avg_pm25")
-        if pm is None:
-            category = None
-        elif pm < 12:
-            category = "Good"
-        elif pm < 35:
-            category = "Moderate"
-        else:
-            category = "Unhealthy"
-        c["aq_category"] = category
+    if pm is None:
+        category = None
+    elif pm < 12:
+        category = "Good"
+    elif pm < 35:
+        category = "Moderate"
+    else:
+        category = "Unhealthy"
+    c["aq_category"] = category
 
     # 7) Visualizations (now part of the real pipeline)
     temp_plot_path = os.path.join(VIS_OUTPUT_DIR, "temp_vs_pm25.png")
