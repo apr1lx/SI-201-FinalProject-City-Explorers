@@ -1,0 +1,152 @@
+City Statistics Results
+----------------------------------------
+City: Ann Arbor
+Population: 150,000
+Average Temperature: -12.76
+Average PM2.5: 12.227992172174206
+Air Quality Category: Moderate
+----------------------------------------
+City: Atlanta
+Population: 250,000
+Average Temperature: 4.35
+Average PM2.5: 16.45869193531108
+Air Quality Category: Moderate
+----------------------------------------
+City: Austin
+Population: 400,000
+Average Temperature: 8.76
+Average PM2.5: 20.293617642683124
+Air Quality Category: Moderate
+----------------------------------------
+City: Boston
+Population: 600,000
+Average Temperature: -7.52
+Average PM2.5: 18.481124421380727
+Air Quality Category: Moderate
+----------------------------------------
+City: Charlotte
+Population: 350,000
+Average Temperature: 1.78
+Average PM2.5: 19.453884684603857
+Air Quality Category: Moderate
+----------------------------------------
+City: Chicago
+Population: 200,000
+Average Temperature: -5.37
+Average PM2.5: 14.559535105515433
+Air Quality Category: Moderate
+----------------------------------------
+City: Columbus
+Population: 300,000
+Average Temperature: -6.65
+Average PM2.5: 15.497181434523672
+Air Quality Category: Moderate
+----------------------------------------
+City: Dallas
+Population: 450,000
+Average Temperature: 6.86
+Average PM2.5: 15.869482953464008
+Air Quality Category: Moderate
+----------------------------------------
+City: Denver
+Population: 300,000
+Average Temperature: 6.83
+Average PM2.5: 14.289009192163586
+Air Quality Category: Moderate
+----------------------------------------
+City: Houston
+Population: 400,000
+Average Temperature: 10.89
+Average PM2.5: 19.255667329099484
+Air Quality Category: Moderate
+----------------------------------------
+City: Indianapolis
+Population: 250,000
+Average Temperature: -4.78
+Average PM2.5: 15.015136839633392
+Air Quality Category: Moderate
+----------------------------------------
+City: Las Vegas
+Population: 600,000
+Average Temperature: 14.79
+Average PM2.5: 19.56096466961712
+Air Quality Category: Moderate
+----------------------------------------
+City: Los Angeles
+Population: 300,000
+Average Temperature: 21.48
+Average PM2.5: 11.372640478025465
+Air Quality Category: Good
+----------------------------------------
+City: Miami
+Population: 500,000
+Average Temperature: 23.29
+Average PM2.5: 10.98636435978431
+Air Quality Category: Good
+----------------------------------------
+City: New York
+Population: 250,000
+Average Temperature: -4.03
+Average PM2.5: 20.10630005703679
+Air Quality Category: Moderate
+----------------------------------------
+City: Orlando
+Population: 550,000
+Average Temperature: 17.36
+Average PM2.5: 19.572042624566905
+Air Quality Category: Moderate
+----------------------------------------
+City: Philadelphia
+Population: 200,000
+Average Temperature: -3.27
+Average PM2.5: 17.987373644088095
+Air Quality Category: Moderate
+----------------------------------------
+City: Phoenix
+Population: 150,000
+Average Temperature: 17.32
+Average PM2.5: 11.322466851493962
+Air Quality Category: Good
+----------------------------------------
+City: Portland
+Population: 450,000
+Average Temperature: 13.18
+Average PM2.5: 15.248151865526816
+Air Quality Category: Moderate
+----------------------------------------
+City: San Antonio
+Population: 150,000
+Average Temperature: 11.32
+Average PM2.5: 19.961514419743764
+Air Quality Category: Moderate
+----------------------------------------
+City: San Diego
+Population: 350,000
+Average Temperature: 19.34
+Average PM2.5: 11.42921303460259
+Air Quality Category: Good
+----------------------------------------
+City: San Francisco
+Population: 350,000
+Average Temperature: 10.0
+Average PM2.5: 10.461672425107052
+Air Quality Category: Good
+----------------------------------------
+City: San Jose
+Population: 200,000
+Average Temperature: 11.02
+Average PM2.5: 12.836807065196506
+Air Quality Category: Moderate
+----------------------------------------
+City: Seattle
+Population: 550,000
+Average Temperature: 12.99
+Average PM2.5: 16.248794299404743
+Air Quality Category: Moderate
+----------------------------------------
+City: Tampa
+Population: 500,000
+Average Temperature: 18.37
+Average PM2.5: 20.904226029663107
+Air Quality Category: Moderate
+----------------------------------------
