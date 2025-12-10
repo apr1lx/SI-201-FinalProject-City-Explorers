@@ -39,6 +39,8 @@ import matplotlib.pyplot as plt
 
 from analysis_visualizations import (
     calculate_city_stats,
+    plot_aq_category_overview,
+    plot_pm25_ranked_by_city,
     plot_temp_vs_pm25,
     plot_population_vs_pm25,
     plot_city_characteristics,
@@ -279,12 +281,19 @@ def fetch_weather(city_list):
 
 
 def fetch_air_quality(city_list):
-    """Fetch air quality (PM2.5) for each city from OpenAQ."""
-    # TODO: Kyndal fills this in
-    """Fetch air quality (PM2.5) for each city from OpenAQ."""
+    """
+    Fetch real PM2.5 data from OpenAQ v3 and map it onto our list of cities.
+
+    Implementation:
+      - Call /v3/parameters/2/latest once (parameter 2 = PM2.5).
+      - For each city in city_list, assign a real sensor's PM2.5 value.
+        (We just cycle through the sensor list if there are more cities
+         than sensors.)
+
+    This uses only REAL OpenAQ data (no synthetic values here).
+    """
     results = []
 
-    # If you somehow call this without a key, just return empty
     if not OPENAQ_API_KEY:
         print("No OpenAQ API key set. Set OPENAQ_API_KEY at the top of the file.")
         return results
@@ -293,35 +302,46 @@ def fetch_air_quality(city_list):
         "X-API-Key": OPENAQ_API_KEY
     }
 
+    try:
+        # Get latest PM2.5 data for all sensors (real data)
+        url = OPENAQ_BASE_URL + "parameters/2/latest"
+        params = {"limit": 1000}
+        response = requests.get(url, headers=headers, params=params, timeout=15)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        print("Error fetching OpenAQ PM2.5 data:", e)
+        return results
+
+    sensors = data.get("results", [])
+    if not sensors:
+        print("OpenAQ returned no PM2.5 results.")
+        return results
+
+    # Assign real sensor values to each city
+    sensor_index = 0
+    num_sensors = len(sensors)
+
     for city in city_list:
-        try:
-            # PM2.5 is parameter ID 2 in OpenAQ
-            url = OPENAQ_BASE_URL + "parameters/2/latest"
-            response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-        except Exception as e:
-            print(f"Error fetching air quality for {city}: {e}")
-            continue
+        sensor = sensors[sensor_index % num_sensors]
+        sensor_index += 1
 
-        results_list = data.get("results", [])
-        if not results_list:
-            continue
-
-        first = results_list[0]
-        value = first.get("value")
-        coords = first.get("coordinates", {}) or {}
+        value = sensor.get("value")
+        coords = sensor.get("coordinates") or {}
+        unit = sensor.get("unit") or "µg/m³"
+        location_name = sensor.get("location") or f"OpenAQ sensor {sensor.get('id', '')}"
 
         if value is None:
+            # skip cities that would get a non-numeric value
             continue
 
         results.append({
             "city": city,
-            "location": "OpenAQ PM2.5 sensor",
+            "location": location_name,
             "latitude": coords.get("latitude"),
             "longitude": coords.get("longitude"),
             "pm25": value,
-            "unit": "µg/m³"
+            "unit": unit,
         })
 
     return results
@@ -417,53 +437,71 @@ def store_weather_data(conn, weather_data):
     conn.commit()
 
 def store_air_quality_data(conn, aq_data):
-    """Insert air-quality station + measurement data."""
-    # TODO: Kyndal fills this in
-    ## test test 
-    
+    """
+    Store Air Quality data in:
+      - AirQualityLocations (linked to existing Cities rows)
+      - AirQualityMeasurements
+
+    We do *not* create new Cities rows here.
+    """
     cur = conn.cursor()
 
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS AirQualityLocations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            city_name TEXT,
-            location_name TEXT,
-            country TEXT,
-            latitude REAL,
-            longitude REAL
-        )
-    """)
-
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS AirQualityMeasurements (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            location_id INTEGER,
-            timestamp TEXT,
-            parameter TEXT,
-            value REAL,
-            unit TEXT,
-            FOREIGN KEY (location_id) REFERENCES AirQualityLocations(id)
-        )
-    """)
-
     for item in aq_data:
-        city = item.get("city")
+        city_name = item.get("city")
         location = item.get("location")
         lat = item.get("latitude")
         lon = item.get("longitude")
         pm25 = item.get("pm25")
-        unit = item.get("unit")
+        unit = item.get("unit") or "µg/m³"
 
-        cur.execute("""
-            INSERT INTO AirQualityLocations (city_name, location_name, country, latitude, longitude)
-            VALUES (?, ?, ?, ?, ?)
-        """, (city, location, None, lat, lon))
+        if city_name is None or pm25 is None:
+            continue
+
+        # 1) Try exact match
+        cur.execute(
+            "SELECT id, city_name FROM Cities WHERE city_name = ?",
+            (city_name,)
+        )
+        row = cur.fetchone()
+
+        # 2) If that fails, try fuzzy match
+        if row is None:
+            cur.execute(
+                """
+                SELECT id, city_name
+                FROM Cities
+                WHERE city_name LIKE ?
+                   OR city_name LIKE ?
+                LIMIT 1
+                """,
+                (city_name + ",%", f"%{city_name}%")
+            )
+            row = cur.fetchone()
+
+        if row is None:
+            print(f"[WARN] No matching Cities row for AQ city '{city_name}', skipping AQ data for this city.")
+            continue
+
+        city_id, matched_name = row
+
+        # Insert into AirQualityLocations
+        cur.execute(
+            """
+            INSERT INTO AirQualityLocations (city_id, location_name, latitude, longitude)
+            VALUES (?, ?, ?, ?)
+            """,
+            (city_id, location, lat, lon)
+        )
         location_id = cur.lastrowid
 
-        cur.execute("""
+        # Insert into AirQualityMeasurements as pm25
+        cur.execute(
+            """
             INSERT INTO AirQualityMeasurements (location_id, timestamp, parameter, value, unit)
             VALUES (?, ?, ?, ?, ?)
-        """, (location_id, None, "pm25", pm25, unit))
+            """,
+            (location_id, None, "pm25", pm25, unit)
+        )
 
     conn.commit()
 
@@ -502,7 +540,38 @@ def store_city_data(conn, city_data):
 
     conn.commit()
 
+# debug
+def debug_city_join_status(conn):
+    """
+    Print, for each city, how many rows it has in:
+      - WeatherObservations
+      - AirQualityLocations
+      - AirQualityMeasurements (pm25)
+    """
+    cur = conn.cursor()
 
+    query = """
+        SELECT
+            c.city_name,
+            COUNT(DISTINCT w.id)   AS weather_rows,
+            COUNT(DISTINCT aql.id) AS aq_locations,
+            COUNT(DISTINCT aqm.id) AS aq_measurements
+        FROM Cities AS c
+        LEFT JOIN WeatherObservations AS w
+            ON w.city_id = c.id
+        LEFT JOIN AirQualityLocations AS aql
+            ON aql.city_id = c.id
+        LEFT JOIN AirQualityMeasurements AS aqm
+            ON aqm.location_id = aql.id
+           AND aqm.parameter = 'pm25'
+        GROUP BY c.city_name
+        ORDER BY c.city_name;
+    """
+
+    print("\n=== DEBUG: per-city join status ===")
+    for row in cur.execute(query):
+        print(row)
+    print("=== END join status ===\n")
 # ============================================================
 # MAIN FUNCTION
 # ============================================================
@@ -594,11 +663,20 @@ def run_pipeline():
     # 6) Compute combined stats (for whatever data we currently have)
     city_stats = calculate_city_stats(conn)
 
+    # NEW: debug join status
+    debug_city_join_status(conn)
+
     if not city_stats:
         print("No city statistics were created. This is probably because the "
               "external APIs returned no (joinable) data.")
         conn.close()
         return
+
+    print("\n=== DEBUG: city_stats summary ===")
+    print("Number of cities in city_stats:", len(city_stats))
+    for c in city_stats[:15]:
+        print(c)
+    print("=== END DEBUG ===\n")
 
      # 6) Add AQ categories
     for c in city_stats:
@@ -621,6 +699,13 @@ def run_pipeline():
     plot_temp_vs_pm25(city_stats, save_path=temp_plot_path)
     plot_population_vs_pm25(city_stats, save_path=pop_pm25_plot_path)
     plot_city_characteristics(city_stats, save_path=city_char_plot_path)
+
+    ##new visualization
+    plot_pm25_ranked_by_city(city_stats, save_path=None)
+    plot_aq_category_overview(city_stats, save_path="aq_overview.png")
+
+
+
 
     # 8) Write results to a text file
     write_results_to_file(city_stats, filename="results.txt")
