@@ -48,15 +48,16 @@ def create_database(db_name="final_project.db"):
 
     # ------------------------------------------
     # TABLE 3: AirQualityLocations (station metadata)
+    #  - normalized: uses city_id FK instead of duplicating city_name string
     # ------------------------------------------
     cur.execute("""
         CREATE TABLE IF NOT EXISTS AirQualityLocations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            city_name TEXT,
+            city_id INTEGER,
             location_name TEXT,
-            country TEXT,
             latitude REAL,
-            longitude REAL
+            longitude REAL,
+            FOREIGN KEY (city_id) REFERENCES Cities(id)
         );
     """)
 
